@@ -1,0 +1,30 @@
+# Maven
+target/
+*.class
+*.jar
+!data/*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# MS Office lock files
+~$*.docx
+~$*.pptx
+~$*.xlsx
+
+# Logs
+*.log
+logs/
+
+# Локальные результаты экспериментов
+docs/results/*.png
+docs/results/raw/

@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>phishing-url-detector :: tui</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0d0d0d;
+    --bg-2:    #161616;
+    --fg:       #d6d6d6;
+    --dim:      #6b6b6b;
+    --line:     #2a2a2a;
+    --amber:    #e3b341;
+    --amber-2:  #b88a1e;
+    --red:      #ff5f56;
+    --green:    #57c463;
+    --blue:     #79b8ff;
+  }
+  html, body { background: var(--bg); margin: 0; padding: 0; }
+  body {
+    color: var(--fg);
+    font-family: 'JetBrains Mono', Consolas, 'Liberation Mono', monospace;
+    font-size: 14px;
+    line-height: 1.55;
+    padding: 24px 28px 60px;
+    min-height: 100vh;
+  }
+  pre, code { font-family: inherit; margin: 0; }
+  pre { white-space: pre; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* layout */
+  .wrap { max-width: 880px; margin: 0; }
+  .row { display: flex; gap: 8px; align-items: stretch; }
+
+  /* hr / dividers (вместо радиусов и теней) */
+  .hr {
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 16px 0;
+  }
+  .hr.dashed { border-top-style: dashed; }
+  .hr.double { border-top-style: double; border-top-width: 3px; }
+
+  /* header */
+  .logo {
+    display: inline-block;
+    border: 1px solid var(--amber-2);
+    padding: 10px 18px;
+    color: var(--amber);
+    line-height: 1.4;
+  }
+  .logo .l1 { font-weight: 700; }
+  .logo .l2 { font-size: 12px; color: var(--amber-2); margin-top: 2px; }
+  .meta { color: var(--dim); font-size: 12px; }
+  .badge {
+    display: inline-block;
+    color: var(--amber); border: 1px solid var(--amber-2);
+    padding: 1px 6px; font-size: 11px; font-weight: 700;
+  }
+
+  /* prompt input */
+  .prompt-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+  }
+  .prompt-line .caret {
+    color: var(--amber); font-weight: 700;
+  }
+  .prompt-line input {
+    flex: 1;
+    background: transparent;
+    color: var(--fg);
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 14px;
+    caret-color: var(--amber);
+  }
+  .prompt-line input::placeholder { color: #555; }
+
+  .btn {
+    background: transparent;
+    color: var(--amber);
+    border: 1px solid var(--amber-2);
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: lowercase;
+  }
+  .btn:hover { background: var(--amber); color: var(--bg); }
+  .btn:disabled { color: var(--dim); border-color: var(--line); cursor: not-allowed; background: transparent; }
+
+  .samples { margin-top: 14px; }
+  .samples .label { color: var(--dim); margin-bottom: 6px; }
+  .samples .item {
+    display: block;
+    color: var(--blue);
+    padding: 2px 0;
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+  }
+  .samples .item:hover { color: var(--amber); text-decoration: underline; }
+  .samples .item::before { content: "  $ check "; color: var(--dim); }
+
+  /* result */
+  #out { display: none; margin-top: 22px; }
+  #out.show { display: block; }
+
+  .verdict-box {
+    border: 1px solid var(--line);
+    padding: 14px 16px;
+    background: var(--bg-2);
+    margin-bottom: 14px;
+  }
+  .verdict-box.bad { border-color: var(--red); }
+  .verdict-box.ok  { border-color: var(--green); }
+  .verdict-label {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+  }
+  .verdict-label.bad { color: var(--red); }
+  .verdict-label.ok  { color: var(--green); }
+  .verdict-sub { color: var(--dim); margin-top: 6px; }
+  .rule-badge {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border: 1px solid var(--red);
+    color: var(--red);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ascii progress bars */
+  .bar-row { display: flex; align-items: center; gap: 12px; margin: 4px 0; }
+  .bar-row .name { width: 110px; color: var(--dim); }
+  .bar-row .bar  { color: var(--amber); }
+  .bar-row .val  { color: var(--fg); }
+
+  /* features table */
+  .ftab { margin-top: 16px; }
+  .ftab .h {
+    color: var(--dim);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .ftab .h .note { color: #444; font-style: normal; font-size: 12px; }
+  .ftab .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 32px;
+    row-gap: 2px;
+  }
+  .ftab .f { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--line); padding: 2px 0; }
+  .ftab .v-neg { color: var(--red); }
+  .ftab .v-pos { color: var(--green); }
+  .ftab .v-zero { color: var(--dim); }
+
+  /* status bar */
+  .status {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg-2);
+    border-top: 1px solid var(--line);
+    padding: 6px 16px;
+    font-size: 12px;
+    color: var(--dim);
+    display: flex;
+    justify-content: space-between;
+  }
+  .status b { color: var(--amber); }
+
+  .err { color: var(--red); margin-top: 6px; }
+
+  /* selection */
+  ::selection { background: var(--amber-2); color: var(--bg); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<div class="logo">
+  <div class="l1">phishing-url-detector :: v1.0</div>
+  <div class="l2" id="logo-sub">java + weka · random forest · loading model…</div>
+</div>
+
+<div class="meta">
+  source: <a href="https://github.com/sl4sh73r/phishing-url-detector" target="_blank">github.com/sl4sh73r/phishing-url-detector</a>
+  · author: myslivets.l.v · group: bsmo-12-25
+</div>
+
+<hr class="hr">
+
+<div class="row">
+  <div class="prompt-line" style="flex:1;">
+    <span class="caret">&gt;</span>
+    <input type="text" id="url-input"
+           placeholder="enter url — e.g. http://paypal-secure.tk/login"
+           autocomplete="off" spellcheck="false" autocapitalize="off">
+  </div>
+  <button id="check-btn" class="btn">[ analyze ]</button>
+</div>
+
+<div id="error" class="err"></div>
+
+<div class="samples">
+  <div class="label">// samples (click to run):</div>
+  <button class="item" data-url="https://www.google.com/">https://www.google.com/</button>
+  <button class="item" data-url="https://github.com/sl4sh73r/phishing-url-detector">https://github.com/sl4sh73r/phishing-url-detector</button>
+  <button class="item" data-url="http://paypal-secure-update.tk/login.php">http://paypal-secure-update.tk/login.php</button>
+  <button class="item" data-url="http://192.168.1.5/account/verify@bank.com">http://192.168.1.5/account/verify@bank.com</button>
+  <button class="item" data-url="http://bit.ly/2x3hVerify">http://bit.ly/2x3hVerify</button>
+  <button class="item" data-url="https://signin-apple-icloud.com.account-recovery.support/">https://signin-apple-icloud.com.account-recovery.support/</button>
+  <button class="item" data-url="http://www.вор-данных.com/">http://www.вор-данных.com/ (IDN homograph)</button>
+  <button class="item" data-url="http://google-secure.tk/login">http://google-secure.tk/login (free TLD + brand)</button>
+</div>
+
+<div id="out">
+  <hr class="hr double">
+
+  <div id="verdict" class="verdict-box"></div>
+
+  <div class="bar-row">
+    <span class="name">phishing</span>
+    <pre id="bar-phish" class="bar"></pre>
+    <span id="val-phish" class="val"></span>
+  </div>
+  <div class="bar-row">
+    <span class="name">legitimate</span>
+    <pre id="bar-legit" class="bar"></pre>
+    <span id="val-legit" class="val"></span>
+  </div>
+
+  <div class="ftab">
+    <div class="h">
+      <span>[ features ]</span>
+      <span class="note">-1 = suspicious · 0 = unknown · +1 = legit-like</span>
+    </div>
+    <div id="features" class="grid"></div>
+  </div>
+</div>
+
+</div>
+
+<div class="status">
+  <span>build <b>1.0</b> · jdk 17 · weka 3.8.6</span>
+  <span class="mode-info">mode lexical-only · 10 features · no-network</span>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const BAR_LEN = 24;
+
+function bar(pct) {
+  const filled = Math.round(pct / 100 * BAR_LEN);
+  return '█'.repeat(filled) + '░'.repeat(BAR_LEN - filled);
+}
+
+async function predict(url) {
+  const btn = $('check-btn');
+  const err = $('error');
+  err.textContent = '';
+  btn.disabled = true;
+  btn.textContent = '[ running... ]';
+
+  try {
+    const r = await fetch('/api/predict', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'request failed');
+    render(data);
+  } catch (e) {
+    err.textContent = '[!] ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '[ analyze ]';
+  }
+}
+
+function render(d) {
+  const phishPct = (d.probabilityPhishing * 100);
+  const legitPct = (d.probabilityLegitimate * 100);
+
+  const verdictBox = $('verdict');
+  const ruleHtml = d.ruleOverride
+    ? '<div class="rule-badge">rule triggered: ' + d.ruleOverride + '</div>'
+    : '';
+
+  if (d.phishing) {
+    verdictBox.className = 'verdict-box bad';
+    verdictBox.innerHTML =
+      '<div class="verdict-label bad">[!] PHISHING DETECTED</div>' +
+      '<div class="verdict-sub">confidence ' + phishPct.toFixed(1) + '% · model: random forest (100 trees)</div>' +
+      ruleHtml;
+  } else {
+    verdictBox.className = 'verdict-box ok';
+    verdictBox.innerHTML =
+      '<div class="verdict-label ok">[ok] LEGITIMATE</div>' +
+      '<div class="verdict-sub">confidence ' + legitPct.toFixed(1) + '% · model: random forest (100 trees)</div>' +
+      ruleHtml;
+  }
+
+  $('bar-phish').textContent = bar(phishPct);
+  $('bar-legit').textContent = bar(legitPct);
+  $('val-phish').textContent = phishPct.toFixed(1).padStart(5, ' ') + ' %';
+  $('val-legit').textContent = legitPct.toFixed(1).padStart(5, ' ') + ' %';
+
+  const f = $('features');
+  f.innerHTML = '';
+  for (const [name, val] of Object.entries(d.features)) {
+    let cls, sym;
+    if (val === -1)      { cls = 'v-neg'; sym = '-1'; }
+    else if (val === 1)  { cls = 'v-pos'; sym = '+1'; }
+    else                 { cls = 'v-zero'; sym = ' 0'; }
+    f.insertAdjacentHTML('beforeend',
+      '<div class="f"><span>' + name + '</span><span class="' + cls + '">' + sym + '</span></div>');
+  }
+
+  $('out').classList.add('show');
+}
+
+$('check-btn').addEventListener('click', () => {
+  const u = $('url-input').value.trim();
+  if (u) predict(u);
+});
+$('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('check-btn').click();
+});
+document.querySelectorAll('.samples .item').forEach(b => {
+  b.addEventListener('click', () => {
+    $('url-input').value = b.dataset.url;
+    predict(b.dataset.url);
+  });
+});
+
+// подтянуть инфо о модели в шапку и status-bar
+fetch('/api/info').then(r => r.json()).then(info => {
+  const acc = (info.accuracy * 100).toFixed(1);
+  $('logo-sub').textContent =
+    'java + weka · random forest · ' + info.features + ' lexical features · acc ' + acc + '%';
+  const sb = document.querySelector('.status .mode-info');
+  if (sb) sb.textContent = 'mode ' + info.mode + ' · ' + info.features + ' features · acc ' + acc + '%';
+}).catch(() => {});
+
+// фокус сразу в input
+$('url-input').focus();
+</script>
+</body>
+</html>
